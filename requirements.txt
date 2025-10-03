@@ -1,0 +1,51 @@
+# Core API
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# Hugging Face
+transformers==4.44.2
+torch>=2.2.0
+accelerate>=0.30.0
+
+# Summarizer
+sentencepiece
+protobuf
+datasets
+
+# Optional: if you want GPU acceleration with CUDA 11.8
+# torch==2.2.0+cu118 -f https://download.pytorch.org/whl/torch_stable.html
+
+# Frontend serving
+jinja2
+python-multipart
+
+# Safety/validation
+pydantic==2.9.2
+
+pipecat-ai[whisper,google,elevenlabs,webrtc,twilio,openai,cartesia,silero]
+loguru
+python-dotenv
+# --- Core Libraries ---
+fastapi
+uvicorn  # For running the FastAPI application
+pydantic
+numpy
+torch
+torchaudio
+transformers
+
+# --- Pipecat Core and Service Dependencies ---
+# It is highly recommended to install Pipecat and its dependencies
+# using 'pip install "pipecat-ai[<dependencies>]"'
+# The specific dependencies derived from your code are:
+# 1. Twilio/FastAPI Websocket Transport: Used for the telephony integration.
+# 2. Silero VAD: Used locally for voice activity detection.
+# 3. OpenAI: Used for the LLM service and context management.
+# 4. Cartesia: Used for the TTS service.
+# 5. Silero VAD (Separate dependency used directly in SmartTurnProcessor)
+
+# The correct way to install these together is:
+# pip install "pipecat-ai[twilio, openai, cartesia, silero]"
+# However, for a requirements.txt file, list the base package and the necessary service packages:
+
+

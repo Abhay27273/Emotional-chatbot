@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipecat WebRTC Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .status-box {
+            background: #f7f7f7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-label {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .status-value {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-disconnected {
+            background: #ff4444;
+        }
+
+        .status-connecting {
+            background: #ffaa00;
+        }
+
+        .status-connected {
+            background: #00C851;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #connectBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        #connectBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        #disconnectBtn {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+        }
+
+        #disconnectBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 68, 68, 0.4);
+        }
+
+        .transcript-box {
+            background: #f7f7f7;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e0e0e0;
+        }
+
+        .transcript-title {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .transcript-item {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid #667eea;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .transcript-time {
+            font-size: 0.85em;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .transcript-text {
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .config-box {
+            background: #f0f4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+
+        .config-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.95em;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .debug-info {
+            background: #fff3cd;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 0.85em;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Pipecat WebRTC Client</h1>
+        
+        <div class="config-box">
+            <div class="config-label">Server URL:</div>
+            <input type="text" id="serverUrl" value="" placeholder="Auto-detected server URL">
+        </div>
+
+        <div class="status-box">
+            <div class="status-label">
+                <span class="status-indicator status-disconnected" id="statusIndicator"></span>
+                Connection Status
+            </div>
+            <div class="status-value" id="statusText">Disconnected</div>
+        </div>
+
+        <div class="controls">
+            <button id="connectBtn">Connect</button>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+
+        <div class="transcript-box">
+            <div class="transcript-title">📝 Transcripts</div>
+            <div id="transcripts">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🎤</div>
+                    <div>Connect and start speaking to see transcripts here</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let peerConnection = null;
+        let localStream = null;
+        let dataChannel = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 3;
+
+        const serverUrlInput = document.getElementById('serverUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const transcriptsDiv = document.getElementById('transcripts');
+
+        // Auto-detect server URL
+        let autoDetectedUrl = window.location.origin;
+        
+        // Force HTTPS if we're in a secure context (Codespaces, production)
+        if (window.location.protocol === 'https:' && autoDetectedUrl.startsWith('http:')) {
+            autoDetectedUrl = autoDetectedUrl.replace('http:', 'https:');
+        }
+        
+        // Ensure we use HTTPS for github.dev domains
+        if (window.location.hostname.includes('github.dev') || window.location.hostname.includes('gitpod.io')) {
+            autoDetectedUrl = autoDetectedUrl.replace('http:', 'https:');
+        }
+        
+        serverUrlInput.value = autoDetectedUrl;
+        console.log('Auto-detected server URL:', autoDetectedUrl);
+        console.log('Current page protocol:', window.location.protocol);
+        console.log('Current page hostname:', window.location.hostname);
+        
+        // Show warning if still using HTTP in secure context
+        if (autoDetectedUrl.startsWith('http:') && window.location.protocol === 'https:') {
+            console.warn('⚠️ Mixed content detected! Change to HTTPS');
+            updateStatus('disconnected', '⚠️ Change Server URL to use HTTPS');
+        }
+
+        // Enhanced ICE configuration with STUN and TURN servers
+        const iceConfiguration = {
+            iceServers: [
+                // Google STUN servers
+                { 
+                    urls: [
+                        'stun:stun.l.google.com:19302',
+                        'stun:stun1.l.google.com:19302',
+                        'stun:stun2.l.google.com:19302'
+                    ]
+                },
+                // Metered TURN server
+                { 
+                    urls: [
+                        'turn:openrelay.metered.ca:80',
+                        'turn:openrelay.metered.ca:443',
+                        'turns:openrelay.metered.ca:443'
+                    ],
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                // ExpressTurn TURN server
+                { 
+                    urls: 'turn:relay1.expressturn.com:3478',
+                    username: 'efGUEOMUHRKIELLNKJ',
+                    credential: 'KqIErYvV9Zh6c9gR'
+                },
+                // Numb Viagenie TURN server
+                { 
+                    urls: 'turn:numb.viagenie.ca:3478',
+                    username: 'webrtc@live.com',
+                    credential: 'muazkh'
+                }
+            ],
+            iceCandidatePoolSize: 10
+        };
+
+        console.log('ICE Configuration:', iceConfiguration);
+
+        function updateStatus(status, text) {
+            statusIndicator.className = 'status-indicator status-' + status;
+            statusText.textContent = text;
+        }
+
+        function addTranscript(text) {
+            // Remove empty state if present
+            const emptyState = transcriptsDiv.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const timestamp = new Date().toLocaleTimeString();
+            const transcriptItem = document.createElement('div');
+            transcriptItem.className = 'transcript-item';
+            transcriptItem.innerHTML = `
+                <div class="transcript-time">${timestamp}</div>
+                <div class="transcript-text">${text}</div>
+            `;
+            transcriptsDiv.appendChild(transcriptItem);
+            
+            // Auto-scroll to bottom
+            transcriptsDiv.scrollTop = transcriptsDiv.scrollHeight;
+        }
+
+        async function connect() {
+            try {
+                updateStatus('connecting', 'Requesting microphone access...');
+                connectBtn.disabled = true;
+
+                // Get microphone access with optimal settings
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 16000
+                    } 
+                });
+
+                updateStatus('connecting', 'Creating peer connection with TURN servers...');
+
+                // Create peer connection with enhanced ICE configuration
+                peerConnection = new RTCPeerConnection(iceConfiguration);
+
+                // Add audio track
+                localStream.getTracks().forEach(track => {
+                    console.log('Adding track:', track.kind);
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // Create data channel for receiving transcripts
+                dataChannel = peerConnection.createDataChannel('transcripts');
+                
+                dataChannel.onopen = () => {
+                    console.log('✅ Data channel opened');
+                    updateStatus('connected', 'Connected - Speak into your microphone');
+                };
+
+                dataChannel.onmessage = (event) => {
+                    console.log('📨 Received message:', event.data);
+                    addTranscript(event.data);
+                };
+
+                dataChannel.onerror = (error) => {
+                    console.error('❌ Data channel error:', error);
+                };
+
+                dataChannel.onclose = () => {
+                    console.log('Data channel closed');
+                };
+
+                // Handle incoming tracks (for audio output if needed)
+                peerConnection.ontrack = (event) => {
+                    console.log('🎵 Received remote track:', event.track.kind);
+                };
+
+                // Handle ICE candidates with detailed logging
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        console.log('🧊 ICE candidate:', {
+                            type: event.candidate.type,
+                            protocol: event.candidate.protocol,
+                            address: event.candidate.address,
+                            port: event.candidate.port
+                        });
+                    } else {
+                        console.log('✅ ICE gathering complete');
+                    }
+                };
+
+                // Handle ICE gathering state changes
+                peerConnection.onicegatheringstatechange = () => {
+                    console.log('ICE gathering state:', peerConnection.iceGatheringState);
+                };
+
+                // Handle connection state changes
+                peerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', peerConnection.connectionState);
+                    
+                    if (peerConnection.connectionState === 'connected') {
+                        updateStatus('connected', 'Connected - Speak into your microphone');
+                        disconnectBtn.disabled = false;
+                        reconnectAttempts = 0;
+                    } else if (peerConnection.connectionState === 'disconnected') {
+                        updateStatus('disconnected', 'Connection disconnected');
+                        if (reconnectAttempts < maxReconnectAttempts) {
+                            reconnectAttempts++;
+                            setTimeout(() => {
+                                console.log(`Reconnect attempt ${reconnectAttempts}/${maxReconnectAttempts}`);
+                                disconnect();
+                                connect();
+                            }, 2000);
+                        } else {
+                            disconnect();
+                        }
+                    } else if (peerConnection.connectionState === 'failed') {
+                        updateStatus('disconnected', 'Connection failed - Check console for details');
+                        disconnect();
+                    } else if (peerConnection.connectionState === 'connecting') {
+                        updateStatus('connecting', 'Connecting to peer...');
+                    }
+                };
+
+                // Handle ICE connection state changes with detailed logging
+                peerConnection.oniceconnectionstatechange = () => {
+                    console.log('ICE connection state:', peerConnection.iceConnectionState);
+                    
+                    if (peerConnection.iceConnectionState === 'failed') {
+                        console.error('❌ ICE connection failed!');
+                        console.error('This usually means:');
+                        console.error('1. Network firewall is blocking WebRTC');
+                        console.error('2. TURN servers are not accessible');
+                        console.error('3. NAT traversal failed');
+                        updateStatus('disconnected', 'WebRTC: ICE failed, add a TURN server and see about:webrtc for more details');
+                    } else if (peerConnection.iceConnectionState === 'disconnected') {
+                        console.warn('⚠️ ICE disconnected');
+                    } else if (peerConnection.iceConnectionState === 'connected') {
+                        console.log('✅ ICE connected successfully!');
+                    } else if (peerConnection.iceConnectionState === 'checking') {
+                        updateStatus('connecting', 'Checking network connectivity...');
+                    }
+                };
+
+                updateStatus('connecting', 'Creating offer...');
+
+                // Create offer with specific constraints
+                const offer = await peerConnection.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: false
+                });
+                
+                await peerConnection.setLocalDescription(offer);
+
+                // Wait for ICE gathering to complete for better connectivity
+                if (peerConnection && peerConnection.iceGatheringState !== 'complete') {
+                    updateStatus('connecting', 'Gathering network candidates...');
+                    await new Promise((resolve) => {
+                        let timeoutId = null;
+                        const checkState = () => {
+                            if (!peerConnection || peerConnection.iceGatheringState === 'complete') {
+                                if (timeoutId) clearTimeout(timeoutId);
+                                resolve();
+                            } else {
+                                timeoutId = setTimeout(checkState, 100);
+                            }
+                        };
+                        checkState();
+                        // Timeout after 5 seconds
+                        setTimeout(() => {
+                            if (timeoutId) clearTimeout(timeoutId);
+                            resolve();
+                        }, 5000);
+                    });
+                }
+
+                updateStatus('connecting', 'Sending offer to server...');
+
+                // Send offer to server
+                let serverUrl = serverUrlInput.value;
+                if (serverUrl.endsWith('/')) serverUrl = serverUrl.slice(0, -1);
+                
+                console.log('Sending offer to:', `${serverUrl}/offer`);
+                
+                const response = await fetch(`${serverUrl}/offer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sdp: peerConnection.localDescription.sdp,
+                        type: peerConnection.localDescription.type
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with ${response.status}: ${errorText}`);
+                }
+
+                const answer = await response.json();
+                console.log('Received answer from server');
+                
+                updateStatus('connecting', 'Setting remote description...');
+
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+
+                updateStatus('connecting', 'Waiting for connection...');
+                console.log('✅ WebRTC negotiation complete, waiting for ICE to connect...');
+                
+            } catch (error) {
+                console.error('❌ Connection error:', error);
+                updateStatus('disconnected', `Error: ${error.message}`);
+                disconnect();
+                connectBtn.disabled = false;
+            }
+        }
+
+        function disconnect() {
+            if (dataChannel) {
+                dataChannel.close();
+                dataChannel = null;
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('Stopped track:', track.kind);
+                });
+                localStream = null;
+            }
+
+            updateStatus('disconnected', 'Disconnected');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            reconnectAttempts = 0;
+        }
+
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+
+        // Log browser WebRTC capabilities
+        console.log('Browser WebRTC support:');
+        console.log('- getUserMedia:', !!navigator.mediaDevices?.getUserMedia);
+        console.log('- RTCPeerConnection:', !!window.RTCPeerConnection);
+        console.log('- RTCDataChannel:', !!window.RTCDataChannel);
+    </script>
+</body>
+</html>
